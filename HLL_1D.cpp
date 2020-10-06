@@ -1,4 +1,5 @@
 //coding: utf-8
+//created by Kengo Shibata(Osaka University)
 #include <iostream>
 #include <cmath>
 #include <fstream>
@@ -25,7 +26,7 @@ const double dx = Lx/nx1;//------------length of a cell
 double dt;//----------------------------unit time
 double x[ncells1];//-------------------x-coordinate
 double rho[ncells1];//-----------------density
-double u[ncells1];//-------------------speed of gas
+double u[ncells1];//-------------------velocity of gas
 double p[ncells1];//-------------------pressure
 double Gamma = 1.4;//------------------effective heat capacity raito
 double m[ncells1];//-------------------momentum
@@ -38,8 +39,8 @@ double rho_new[ncells1], m_new[ncells1], E_new[ncells1];
 int main(void)
 {
     //--------------some definition-----------
-    double t=0, time_out, time_lim=3.0, dt_out=0.1;
-    int  nstep=0, n_lim=1, out_n=0;
+    double t=0, time_out, time_lim=0.8, dt_out=0.01;
+    int  nstep=0, n_lim=1000, out_n=0;
 
     //-----------initial condition------------
     //if x<0.5 ... (rho,u,p)=(1.0, 0.0, 1.0)  if x>0.5...(rho,u,p)=(0.125, 0.0, 0.1)
@@ -171,9 +172,9 @@ double hll_update(double rho[], double u[], double p[], double m[], double E[])
 
     //--------output---------------
     for ( int i = is; i <= ie; i++) {
-        rho_new[i] = rho[i] + dt/dx*(fc_rho[i] - fc_rho[i-1]);
-        m_new[i] = m[i] + dt/dx*(fc_u[i] - fc_u[i-1]);
-        E_new[i] = E[i] + dt/dx*(fc_u[i] - fc_u[i-1]);
+        rho_new[i] = rho[i] - dt/dx*(fc_rho[i] - fc_rho[i-1]);
+        m_new[i] = m[i] - dt/dx*(fc_u[i] - fc_u[i-1]);
+        E_new[i] = E[i] - dt/dx*(fc_p[i] - fc_p[i-1]);
     }
 
 }
