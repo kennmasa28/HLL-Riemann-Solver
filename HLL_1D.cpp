@@ -2,6 +2,9 @@
 #include <iostream>
 #include <cmath>
 #include <fstream>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 using namespace std;
 
 
@@ -9,9 +12,9 @@ using namespace std;
 double hll_update(double rho[], double u[], double p[], double m[], double E[]);
 double speed(double rho[], double u[], double p[], int i);
 double decide_dt(double rho[], double u[], double p[]);
+void output(double rho[], double u[], double p[], double x[], double t, int out_n, int nstep);
 
-
-///////////////////////////define valiable/////////////////////////////////////
+////////////////////////define global valiable/////////////////////////////////
 const int nx1 = 100;//-----------------mesh number of space
 const int NGHOST = 1;//----------------ghost cells of edge
 const int is = NGHOST;//---------------start point of calculation
@@ -19,29 +22,29 @@ const int ie = is + nx1 -1;//----------end point of calculation
 const int ncells1 = nx1 + 2*NGHOST;//--mesh number include ghost cells
 const double Lx = 1.0;//---------------length of tube
 const double dx = Lx/nx1;//------------length of a cell
+double dt;//----------------------------unit time
 double x[ncells1];//-------------------x-coordinate
 double rho[ncells1];//-----------------density
 double u[ncells1];//-------------------speed of gas
 double p[ncells1];//-------------------pressure
-double gamma = 1.4;//------------------effective heat capacity raito
+double Gamma = 1.4;//------------------effective heat capacity raito
 double m[ncells1];//-------------------momentum
 double E[ncells1];//-------------------Energy
-double rho_new[ncells1], m_new[ncells1], E_new[ncells1];
-double t=0, dt, time_out, time_lim=3.0, dt_out=0.1;
 double sl,sr;//------------------------max and min eigenvalue
+double rho_new[ncells1], m_new[ncells1], E_new[ncells1];
 
 
 /////////////////////////////////main part/////////////////////////////////////
 int main(void)
 {
-    ofstream ofs1("rho.csv");
-    ofstream ofs2("u.csv");
-    ofstream ofs3("p.csv");
+    //--------------some definition-----------
+    double t=0, time_out, time_lim=3.0, dt_out=0.1;
+    int  nstep=0, n_lim=1, out_n=0;
 
     //-----------initial condition------------
     //if x<0.5 ... (rho,u,p)=(1.0, 0.0, 1.0)  if x>0.5...(rho,u,p)=(0.125, 0.0, 0.1)
     for (int i = 0 ; i < ncells1 ; i++) {
-        x[i] = dx*i;
+        x[i] = -0.5 + dx*i;
         u[i] = 0.0;
         if (i <= (ie-is+1)/2)
         {
@@ -54,32 +57,22 @@ int main(void)
           p[i] = 0.1;
         }
         m[i] = rho[i]*u[i];
-        E[i] = p[i]/(gamma-1) + 0.5*u[i]*u[i]*rho[i];
+        E[i] = p[i]/(Gamma-1) + 0.5*u[i]*u[i]*rho[i];
     }
 
     //------------output initial state---------
-    for(int i = is; i <= ie; i++)
-    {
-      ofs1  <<  rho[i];
-      ofs2  <<  u[i];
-      ofs3  <<  p[i];
-      if (i<ie){
-        ofs1 << ",";
-        ofs2 << ",";
-        ofs3 << ",";
-      }
-    }
-      ofs1  << "\n";
-      ofs2  << "\n";
-      ofs3  << "\n";
+      output(rho, u, p, x, t, out_n, nstep);
+      out_n += 1;
       time_out = dt_out;
 
 
     //-------Solve Riemann Problems----------
-    while ( t <= time_lim ) {
+    while (t <= time_lim && nstep < n_lim) {
 
         //decide dt
         dt = decide_dt(rho,u,p);
+        t += dt;
+        nstep += 1;
 
         //update u_new, m_new, E_new
         hll_update(rho,u,p,m,E);
@@ -98,30 +91,20 @@ int main(void)
             m[i] = m_new[i];
             E[i] = E_new[i];
             u[i] = m[i]/rho[i];
-            p[i] = (gamma-1)*(E[i] - 0.5*m[i]*m[i]/rho[i]);
+            p[i] = (Gamma-1)*(E[i] - 0.5*m[i]*m[i]/rho[i]);
         }
 
         //update time and output
         if (t >= time_out)
         {
-          for(int i = is; i <= ie; i++)
-          {
-            ofs1  <<  rho[i];
-            ofs2  <<  u[i];
-            ofs3  <<  p[i];
-            if (i<ie){
-              ofs1 << ",";
-              ofs2 << ",";
-              ofs3 << ",";
-            }
-          }
-            ofs1  << "\n";
-            ofs2  << "\n";
-            ofs3  << "\n";
+            output(rho, u, p, x, t, out_n, nstep);
+            out_n += 1;
             time_out += dt_out;
-          }
-        t = t + dt;
-    }
+        }
+
+    }//while
+
+    output(rho, u, p, x, t, out_n, nstep);
 }
 
 
@@ -204,8 +187,8 @@ double speed(double rho[], double u[], double p[], int i)
     double ur = u[i+1];
     double pl = p[i];
     double pr = p[i+1];
-    double c_l = sqrt(gamma*pl/rho_l);
-    double c_r = sqrt(gamma*pr/rho_r);
+    double c_l = sqrt(Gamma*pl/rho_l);
+    double c_r = sqrt(Gamma*pr/rho_r);
     sl = ul - c_l;
     sr = ur + c_r;
 }
@@ -216,9 +199,33 @@ double decide_dt(double rho[], double u[], double p[])
     double dt = 10000, dt_i;
     for (int i = is; i <= ie; i++)
     {
-        dt_i = dx/abs(u[i] + sqrt(gamma*p[i]/rho[i]));
+        dt_i = dx/abs(u[i] + sqrt(Gamma*p[i]/rho[i]));
         dt = min(dt_i,dt);
     }
     //std::cout<<dt << "\n";
     return dt;
+}
+
+////////////////////////////output/////////////////////////////////////////////////
+void output(double rho[], double u[], double p[], double x[], double t, int out_n, int nstep)
+{
+    FILE *pfile;
+    std::string  fname;
+    char tlabel[5];
+
+    std::snprintf(tlabel, sizeof(tlabel), "%04d", out_n);
+    fname.assign("result_");
+    fname.append(tlabel);
+    fname.append(".tab");
+    pfile = fopen(fname.c_str(), "w");
+    std::fprintf(pfile, "#at time = %4lf, step = %04d\n", t, nstep);
+    std::fprintf(pfile, "#i      #x      #rho     #velocity    #pressure\n");
+
+
+    for(int i = is; i <= ie; i++)
+    {
+        std::fprintf(pfile, "%04d %04lf %010lf %010lf %010lf\n",i, x[i], rho[i], u[i], p[i]);
+    }
+    fclose(pfile);
+
 }
