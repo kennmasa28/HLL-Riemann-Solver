@@ -197,6 +197,7 @@ double speed(double rho[], double u[], double p[], int i)
 ////////////////////////////////decide dt//////////////////////////////////////
 double decide_dt(double rho[], double u[], double p[])
 {
+    double cfl = 0.5;
     double dt = 10000, dt_i;
     for (int i = is; i <= ie; i++)
     {
@@ -204,7 +205,7 @@ double decide_dt(double rho[], double u[], double p[])
         dt = min(dt_i,dt);
     }
     //std::cout<<dt << "\n";
-    return dt;
+    return dt*cfl;
 }
 
 ////////////////////////////output/////////////////////////////////////////////////
